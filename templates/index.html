@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Smart Gate</title>
+
+<script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+<script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+<script src="https://unpkg.com/babel-standalone@6/babel.min.js"></script>
+
+<link rel="stylesheet" href="/static/style.css">
+</head>
+
+<body>
+<div id="root"></div>
+
+<script type="text/babel">
+
+function App(){
+
+const [plate,setPlate]=React.useState("----");
+const [status,setStatus]=React.useState("");
+const [owner,setOwner]=React.useState("");
+const [confidence,setConfidence]=React.useState("--");
+const [lastVisit,setLastVisit]=React.useState(null);
+
+React.useEffect(()=>{
+const socket=io();
+
+socket.on("plate_detected",(data)=>{
+    setPlate(data.plate);
+    setStatus(data.status);
+    setOwner(data.owner);
+    setConfidence(data.confidence);
+    setLastVisit(data.last_visit);
+});
+},[]);
+
+return(
+<div className="container">
+
+<h1>🚗 Smart Gate Dashboard</h1>
+
+<div className="dashboard">
+
+<div className="video-box">
+<img src="/video_feed"/>
+</div>
+
+<div className="card">
+
+<div className="label">Plate</div>
+<div className="plate">{plate}</div>
+
+<div className="label">Owner</div>
+<div className="plate">{owner}</div>
+
+<div className="label">Confidence</div>
+<div className="plate">{confidence}</div>
+
+<div className={
+"status "+
+(status.includes("GRANTED")?"granted":
+ status.includes("DENIED")?"denied":"unknown")
+}>
+{status}
+</div>
+
+</div>
+
+<div className="card">
+
+<h3>Last Visit</h3>
+
+{lastVisit ? (
+<div className="result">
+<p><b>Plate:</b> {lastVisit.plate}</p>
+<p><b>Owner:</b> {lastVisit.owner}</p>
+<p><b>Status:</b> {lastVisit.status}</p>
+<p><b>Time:</b> {lastVisit.time}</p>
+</div>
+) : (
+<p>No previous record</p>
+)}
+
+</div>
+
+</div>
+
+</div>
+);
+}
+
+ReactDOM.render(<App />,document.getElementById("root"));
+
+</script>
+</body>
+</html>
