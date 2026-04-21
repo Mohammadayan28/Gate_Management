@@ -1,11 +1,11 @@
 plate,authorized,owner,entries
 KA50ME7056,True,Ayan,5
 KA01AB1234,True,Rahul,2
-KA03MN4567,True,Imran,1
+KA03MN4567,False,Imran,1
 KA05CD7890,True,Sneha,0
 KA09XY1111,False,Arjun,3
 KA11PQ2222,True,Neha,4
 KA02ZZ9999,False,Vikram,2
 KA07GH3456,True,Priya,6
 KA19LK8080,True,Sameer,1
-KA21TR5678,True,Kiran,0
+KA21TR5678,False,Kiran,0

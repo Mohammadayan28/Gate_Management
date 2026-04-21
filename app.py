@@ -1,64 +1,41 @@
-import sys
-import subprocess
-
-# -------------------------------
-# AUTO INSTALL DEPENDENCIES
-# -------------------------------
-def install(package):
-    subprocess.check_call([
-        sys.executable, "-m", "pip", "install",
-        package, "--break-system-packages"
-    ])
-
-required_packages = {
-    "flask": "flask",
-    "flask_socketio": "flask-socketio",
-    "cv2": "opencv-python",
-    "fast_alpr": "fast-alpr",
-    "onnxruntime": "onnxruntime",
-    "PIL": "Pillow"
-}
-
-for module, package in required_packages.items():
-    try:
-        __import__(module)
-    except ImportError:
-        print(f"📦 Installing {package}...")
-        install(package)
-
-# -------------------------------
-# IMPORT AFTER INSTALL
-# -------------------------------
-from flask import Flask, render_template, Response
+from flask import Flask, render_template, Response, jsonify
 from flask_socketio import SocketIO
-import cv2, time, re, csv
+import cv2, time, re, csv, sys, subprocess
 from datetime import datetime
 from collections import Counter
 
-# -------------------------------
-# APP INIT
-# -------------------------------
 app = Flask(__name__)
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode="threading")
 
 # -------------------------------
-# LOAD ALPR MODEL
+# INSTALL MODEL
 # -------------------------------
-from fast_alpr import ALPR
-
-alpr = ALPR(
-    detector_model="yolo-v9-t-384-license-plate-end2end",
-    ocr_model="cct-s-v2-global-model",
-)
+try:
+    from fast_alpr import ALPR
+except ImportError:
+    subprocess.check_call([
+        sys.executable, "-m", "pip", "install",
+        "fast-alpr", "onnxruntime", "Pillow",
+        "--break-system-packages"
+    ])
+    from fast_alpr import ALPR
 
 # -------------------------------
-# CAMERA INIT
+# CAMERA
 # -------------------------------
 cap = cv2.VideoCapture(0)
 time.sleep(1)
 
 if not cap.isOpened():
-    raise RuntimeError("❌ Camera not accessible. Run with sudo or fix permissions.")
+    raise RuntimeError("Camera not accessible")
+
+# -------------------------------
+# LOAD MODEL
+# -------------------------------
+alpr = ALPR(
+    detector_model="yolo-v9-t-384-license-plate-end2end",
+    ocr_model="cct-s-v2-global-model",
+)
 
 # -------------------------------
 # VALIDATION
@@ -79,7 +56,7 @@ def validate(text):
     return None
 
 # -------------------------------
-# DATABASE LOAD
+# DATABASE
 # -------------------------------
 vehicles = {}
 try:
@@ -90,7 +67,7 @@ try:
                 "owner": row["owner"]
             }
 except:
-    print("⚠️ No vehicles.csv found")
+    print("No DB found")
 
 def check_access(plate):
     if plate in vehicles:
@@ -99,14 +76,15 @@ def check_access(plate):
     return "NOT FOUND", "Unknown"
 
 # -------------------------------
-# LAST VISIT
+# GET LAST VISIT (IMPORTANT)
 # -------------------------------
 def get_last_visit(plate):
     try:
         with open("logs.csv", "r") as f:
             rows = list(csv.reader(f))
 
-        for row in reversed(rows[:-1]):
+        # search from latest
+        for row in reversed(rows[:-1]):  # skip current write
             log_plate, owner, status, timestamp = row
             if log_plate == plate:
                 return {
@@ -115,6 +93,7 @@ def get_last_visit(plate):
                     "status": status,
                     "time": timestamp
                 }
+
     except:
         pass
 
@@ -162,7 +141,7 @@ def generate_frames():
 def scan_loop():
     global plate_buffer, confidence_buffer, last_emit_time
 
-    print("🚀 Scan loop started")
+    print("Scan loop started")
 
     while True:
         try:
@@ -199,7 +178,7 @@ def scan_loop():
 
                     status, owner = check_access(final_plate)
 
-                    # get last visit BEFORE logging new
+                    # 🔥 GET LAST VISIT BEFORE LOGGING NEW ONE
                     last_visit = get_last_visit(final_plate)
 
                     log_entry(final_plate, owner, status)
@@ -217,7 +196,7 @@ def scan_loop():
                     last_emit_time = current_time
 
         except Exception as e:
-            print("❌ Scan error:", e)
+            print("Scan error:", e)
 
 # -------------------------------
 # ROUTES
@@ -232,9 +211,8 @@ def video_feed():
         mimetype='multipart/x-mixed-replace; boundary=frame')
 
 # -------------------------------
-# MAIN
+# RUN
 # -------------------------------
 if __name__ == "__main__":
-    print("🔥 Starting Smart Gate System...")
     socketio.start_background_task(scan_loop)
     socketio.run(app, debug=True, use_reloader=False)
